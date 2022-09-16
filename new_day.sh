@@ -1,8 +1,8 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 set -e;
 
-day=$(find . -name 'day-*' | tail -n 1 | sed 's/[^0-9]//g');
+day=$(find . -name 'day-*' | sort -V | tail -n 1 | sed 's/[^0-9]//g');
 
 day=$((day+1));
 
