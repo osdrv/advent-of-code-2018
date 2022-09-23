@@ -18,6 +18,79 @@ const (
 	TORCH
 )
 
+type MinHeap struct {
+	items []Point3
+	index map[Point3]int
+	less  func(a, b Point3) bool
+}
+
+func NewMinHeap(less func(a, b Point3) bool) *MinHeap {
+	return &MinHeap{
+		items: make([]Point3, 0, 1),
+		index: make(map[Point3]int),
+		less:  less,
+	}
+}
+
+func (h *MinHeap) Size() int {
+	return len(h.items)
+}
+
+func (h *MinHeap) Push(item Point3) {
+	last := len(h.items)
+	if _, ok := h.index[item]; !ok {
+		h.items = append(h.items, item)
+		h.index[item] = last
+	}
+	ptr := h.index[item]
+	h.reheapAt(ptr)
+}
+
+func (h *MinHeap) Pop() Point3 {
+	last := len(h.items) - 1
+	h.swap(0, last)
+	item := h.items[last]
+	h.items = h.items[:last]
+	delete(h.index, item)
+	h.reheapAt(0)
+
+	return item
+}
+
+func (h *MinHeap) swap(i, j int) {
+	h.index[h.items[i]], h.index[h.items[j]] = h.index[h.items[j]], h.index[h.items[i]]
+	h.items[i], h.items[j] = h.items[j], h.items[i]
+}
+
+func (h *MinHeap) reheapAt(ptr int) {
+	for ptr > 0 {
+		parent := (ptr - 1) / 2
+		if h.less(h.items[ptr], h.items[parent]) {
+			h.swap(ptr, parent)
+			ptr = parent
+		} else {
+			break
+		}
+	}
+
+	for ptr < len(h.items) {
+		ch1, ch2 := ptr*2+1, ptr*2+2
+		next := ptr
+		if ch1 < len(h.items) && h.less(h.items[ch1], h.items[next]) {
+			next = ch1
+		}
+		if ch2 < len(h.items) && h.less(h.items[ch2], h.items[next]) {
+			next = ch2
+		}
+		if next != ptr {
+			h.swap(ptr, next)
+			ptr = next
+		} else {
+			break
+		}
+	}
+}
+
 func GenGraph(depth int, target Point2) func(int, int) int {
 
 	var geoIxAt func(x, y int) int
@@ -110,34 +183,17 @@ func main() {
 	gScore[start] = 0
 	fScore[start] = h(start)
 
-	q := make([]Point3, 0, 1)
-	q = append(q, start)
+	q := NewMinHeap(func(a, b Point3) bool {
+		return fScore[a] < fScore[b]
+	})
+	q.Push(start)
 
-	heapify := func() {
-		minix := 0
-		minv := fScore[q[0]]
-		for ix := 1; ix < len(q); ix++ {
-			if v := fScore[q[ix]]; v < minv {
-				minix = ix
-				minv = v
-			}
-		}
-		q[0], q[minix] = q[minix], q[0]
-	}
-
-	enq := make(map[Point3]bool)
-	enq[start] = true
-
-	var curr Point3
-	for len(q) > 0 {
-		heapify()
-		curr, q = q[0], q[1:]
+	for q.Size() > 0 {
+		curr := q.Pop()
 		if curr == finish {
 			printf("Min time: %d", gScore[curr])
 			break
 		}
-
-		enq[curr] = false
 
 		currtyp := graph(curr.x, curr.y)
 
@@ -164,10 +220,7 @@ func main() {
 				if ngScore < gScore[np] {
 					gScore[np] = ngScore
 					fScore[np] = ngScore + h(np)
-					if !enq[np] {
-						q = append(q, Point3{nx, ny, neq})
-						enq[np] = true
-					}
+					q.Push(Point3{nx, ny, neq})
 				}
 			}
 		}
