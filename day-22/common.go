@@ -39,6 +39,10 @@ var (
 	}
 )
 
+type Number interface {
+	byte | int | int32 | int64 | uint32 | uint64 | float64
+}
+
 func noerr(err error) {
 	if err != nil {
 		panic(fmt.Sprintf("unhandled error: %s", err))
@@ -90,85 +94,75 @@ func parseInts(s string) []int {
 	return nums
 }
 
-type Point2 struct {
-	x, y int
-}
-
-func NewPoint2(x, y int) *Point2 {
-	return &Point2{x, y}
-}
-
-func (p2 *Point2) String() string {
-	return fmt.Sprintf("P2{%d, %d}", p2.x, p2.y)
-}
-
-type Point3 struct {
-	x, y, z int
-}
-
-func (p3 *Point3) String() string {
-	return fmt.Sprintf("P3{%d, %d, %d}", p3.x, p3.y, p3.z)
-}
-
-func NewPoint3(x, y, z int) *Point3 {
-	return &Point3{x, y, z}
+func makeNumField[N Number](h, w int) [][]N {
+	res := make([][]N, h)
+	for i := 0; i < h; i++ {
+		res[i] = make([]N, w)
+	}
+	return res
 }
 
 func makeIntField(h, w int) [][]int {
-	res := make([][]int, h)
-	for i := 0; i < h; i++ {
-		res[i] = make([]int, w)
-	}
-	return res
+	return makeNumField[int](h, w)
 }
 
 func makeByteField(h, w int) [][]byte {
-	res := make([][]byte, h)
-	for i := 0; i < h; i++ {
-		res[i] = make([]byte, w)
-	}
-	return res
+	return makeNumField[byte](h, w)
 }
 
+func sizeNumField[N Number](field [][]N) (int, int) {
+	rows, cols := len(field), 0
+	if rows > 0 {
+		cols = len(field[0])
+	}
+	return rows, cols
+}
+
+// Deprecated: please use `sizeNumField` instead.
 func sizeIntField(field [][]int) (int, int) {
-	rows, cols := len(field), 0
-	if rows > 0 {
-		cols = len(field[0])
-	}
-	return rows, cols
+	return sizeNumField(field)
 }
 
+// Deprecated: please use `sizeNumField` instead.
 func sizeByteField(field [][]byte) (int, int) {
-	rows, cols := len(field), 0
-	if rows > 0 {
-		cols = len(field[0])
-	}
-	return rows, cols
+	return sizeNumField(field)
 }
 
+func copyNumField[N Number](field [][]N) [][]N {
+	cp := makeNumField[N](sizeNumField(field))
+	for i := 0; i < len(field); i++ {
+		copy(cp[i], field[i])
+	}
+	return cp
+}
+
+// Deprecated: please use `copyNumField` instead.
 func copyIntField(field [][]int) [][]int {
-	cp := makeIntField(sizeIntField(field))
-	for i := 0; i < len(field); i++ {
-		copy(cp[i], field[i])
-	}
-	return cp
+	return copyNumField(field)
 }
 
+// Deprecated: please use `copyNumField` instead.
 func copyByteField(field [][]byte) [][]byte {
-	cp := makeByteField(sizeByteField(field))
-	for i := 0; i < len(field); i++ {
-		copy(cp[i], field[i])
-	}
-	return cp
+	return copyNumField(field)
 }
 
+func printNumField[N Number](field [][]N, sep string) string {
+	return printNumFieldWithSubs(field, sep, make(map[N]string))
+}
+
+// Deprecated: please use `printNumField` instead.
 func printIntField(field [][]int, sep string) string {
-	return printIntFieldWithSubs(field, sep, make(map[int]string))
+	return printNumFieldWithSubs(field, sep, make(map[int]string))
 }
 
-func printIntFieldWithSubs(field [][]int, sep string, subs map[int]string) string {
+// Deprecated: please use `printNumField` instead.
+func printByteField(field [][]byte, sep string) string {
+	return printNumFieldWithSubs(field, sep, make(map[byte]string))
+}
+
+func printNumFieldWithSubs[N Number](field [][]N, sep string, subs map[N]string) string {
 	var buf bytes.Buffer
-	rows, cols := sizeIntField(field)
+	rows, cols := sizeNumField(field)
 	for i := 0; i < rows; i++ {
 		for j := 0; j < cols; j++ {
 			if j > 0 {
@@ -186,45 +180,29 @@ func printIntFieldWithSubs(field [][]int, sep string, subs map[int]string) strin
 	return buf.String()
 }
 
-func printByteField(field [][]byte, sep string) string {
-	return printByteFieldWithSubs(field, sep, make(map[byte]string))
+func printIntFieldWithSubs(field [][]int, sep string, subs map[int]string) string {
+	return printNumFieldWithSubs(field, sep, subs)
 }
 
 func printByteFieldWithSubs(field [][]byte, sep string, subs map[byte]string) string {
-	var buf bytes.Buffer
-	rows, cols := sizeByteField(field)
-	for i := 0; i < rows; i++ {
-		for j := 0; j < cols; j++ {
-			if j > 0 {
-				buf.WriteString(sep)
-			}
-			if sub, ok := subs[field[i][j]]; ok {
-				buf.WriteString(sub)
-			} else {
-				buf.WriteByte('0' + field[i][j])
-			}
-		}
-		buf.WriteByte('\n')
-	}
-	buf.WriteByte('\n')
-	return buf.String()
+	return printNumFieldWithSubs(field, sep, subs)
 }
 
-func min(a, b int) int {
+func min[N Number](a, b N) N {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func max(a, b int) int {
+func max[N Number](a, b N) N {
 	if a > b {
 		return a
 	}
 	return b
 }
 
-func abs(v int) int {
+func abs[N Number](v N) N {
 	if v < 0 {
 		return -v
 	}
@@ -280,40 +258,42 @@ func mapByteArr(arr []byte, mapfn func(byte) byte) []byte {
 	return res
 }
 
+func reverseNumArr[N Number](arr []N) []N {
+	res := make([]N, len(arr))
+	for i := 0; i < len(arr); i++ {
+		res[len(arr)-1-i] = arr[i]
+	}
+	return res
+}
+
+// Deprecated: please use `reverseNumArr` instead.
 func reverseIntArr(arr []int) []int {
-	res := make([]int, len(arr))
-	for i := 0; i < len(arr); i++ {
-		res[len(arr)-1-i] = arr[i]
-	}
-	return res
+	return reverseNumArr(arr)
 }
 
+// Deprecated: please use `reverseNumArr` instead.
 func reverseByteArr(arr []byte) []byte {
-	res := make([]byte, len(arr))
+	return reverseByteArr(arr)
+}
+
+func grepNumArr[N Number](arr []N, grepfn func(N) bool) []N {
+	res := make([]N, 0, len(arr))
 	for i := 0; i < len(arr); i++ {
-		res[len(arr)-1-i] = arr[i]
+		if grepfn(arr[i]) {
+			res = append(res, arr[i])
+		}
 	}
 	return res
 }
 
+// Deprecated: please use `grepNumArr` instead.
 func grepIntArr(arr []int, grepfn func(int) bool) []int {
-	res := make([]int, 0, len(arr))
-	for i := 0; i < len(arr); i++ {
-		if grepfn(arr[i]) {
-			res = append(res, arr[i])
-		}
-	}
-	return res
+	return grepNumArr(arr, grepfn)
 }
 
+// Deprecated: please use `grepNumArr` instead.
 func grepByteArr(arr []byte, grepfn func(byte) bool) []byte {
-	res := make([]byte, 0, len(arr))
-	for i := 0; i < len(arr); i++ {
-		if grepfn(arr[i]) {
-			res = append(res, arr[i])
-		}
-	}
-	return res
+	return grepNumArr(arr, grepfn)
 }
 
 // logging function
@@ -324,4 +304,103 @@ func printf(format string, v ...interface{}) {
 
 func fatalf(format string, v ...interface{}) {
 	log.Fatalf(format, v...)
+}
+
+// Data types
+
+type BinHeap[T comparable] struct {
+	items []T
+	index map[T]int
+	cmp   func(a, b T) bool
+}
+
+func NewBinHeap[T comparable](cmp func(a, b T) bool) *BinHeap[T] {
+	return &BinHeap[T]{
+		items: make([]T, 0, 1),
+		index: make(map[T]int),
+		cmp:   cmp,
+	}
+}
+
+func (h *BinHeap[T]) Size() int {
+	return len(h.items)
+}
+
+func (h *BinHeap[T]) Push(item T) {
+	last := len(h.items)
+	if _, ok := h.index[item]; !ok {
+		h.items = append(h.items, item)
+		h.index[item] = last
+	}
+	ptr := h.index[item]
+	h.reheapAt(ptr)
+}
+
+func (h *BinHeap[T]) Pop() T {
+	last := len(h.items) - 1
+	h.swap(0, last)
+	item := h.items[last]
+	h.items = h.items[:last]
+	delete(h.index, item)
+	h.reheapAt(0)
+
+	return item
+}
+
+func (h *BinHeap[T]) swap(i, j int) {
+	h.index[h.items[i]], h.index[h.items[j]] = h.index[h.items[j]], h.index[h.items[i]]
+	h.items[i], h.items[j] = h.items[j], h.items[i]
+}
+
+func (h *BinHeap[T]) reheapAt(ptr int) {
+	for ptr > 0 {
+		parent := (ptr - 1) / 2
+		if h.cmp(h.items[ptr], h.items[parent]) {
+			h.swap(ptr, parent)
+			ptr = parent
+		} else {
+			break
+		}
+	}
+
+	for ptr < len(h.items) {
+		ch1, ch2 := ptr*2+1, ptr*2+2
+		next := ptr
+		if ch1 < len(h.items) && h.cmp(h.items[ch1], h.items[next]) {
+			next = ch1
+		}
+		if ch2 < len(h.items) && h.cmp(h.items[ch2], h.items[next]) {
+			next = ch2
+		}
+		if next != ptr {
+			h.swap(ptr, next)
+			ptr = next
+		} else {
+			break
+		}
+	}
+}
+
+type Point2 struct {
+	x, y int
+}
+
+func NewPoint2(x, y int) *Point2 {
+	return &Point2{x, y}
+}
+
+func (p2 *Point2) String() string {
+	return fmt.Sprintf("P2{%d, %d}", p2.x, p2.y)
+}
+
+type Point3 struct {
+	x, y, z int
+}
+
+func (p3 *Point3) String() string {
+	return fmt.Sprintf("P3{%d, %d, %d}", p3.x, p3.y, p3.z)
+}
+
+func NewPoint3(x, y, z int) *Point3 {
+	return &Point3{x, y, z}
 }
